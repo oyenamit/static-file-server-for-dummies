@@ -1,0 +1,769 @@
+/* ***** BEGIN LICENSE BLOCK *****
+ *
+ * Copyright (C) 2018 Namit Bhalla (oyenamit@gmail.com)
+ * This file is part of 'Static File Server for Dummies' package.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * ***** END LICENSE BLOCK ***** */
+
+
+/**
+ * @file Mocha-style tests for static file server. This file uses HTTP requests and responses to validate the server.
+ * @copyright Copyright (C) 2018 Namit Bhalla (oyenamit@gmail.com)
+ * @license GPL-3.0-or-later
+ * @see test-server.js
+ * @see unit-tests.js
+ */
+
+
+var constants = require('../common/inc.js');
+var request = require("request");
+var assert = require('assert');
+
+
+describe('Test File Server', function() {
+
+    describe('Test request for a file', function() {
+
+        it('Get file returns 200', function(done) {
+            var fileUrl = constants.SERVER_URL + '/GetFile';
+            request(fileUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+
+                assert.deepStrictEqual(res.headers[constants.HTTP_ACCEPT_RANGES_HEADER_NAME], constants.HTTP_ACCEPT_RANGES_HEADER_VAL);
+                assert.notDeepStrictEqual(res.headers[constants.HTTP_DATE_HEADER_NAME], undefined);
+                assert.notDeepStrictEqual(res.headers[constants.HTTP_LAST_MODIFIED_HEADER_NAME], undefined);
+                assert.notDeepStrictEqual(res.headers[constants.HTTP_ETAG_HEADER_NAME], undefined);
+                assert.notDeepStrictEqual(res.headers[constants.HTTP_CONTENT_LENGTH_HEADER_NAME], undefined);
+                assert.notDeepStrictEqual(res.headers[constants.HTTP_CONTENT_DISPOSITION_HEADER_NAME], undefined);
+                assert.notDeepStrictEqual(res.headers[constants.HTTP_CONTENT_TYPE_HEADER_NAME], undefined);
+                done();
+            });
+        }); // end it
+
+    }); // end describe
+
+    describe('Request invalid paths', function() {
+
+        it('Get malicious path', function(done) {
+            var maliciousUrl = constants.SERVER_URL + '/GetMaliciousPath';
+            request(maliciousUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 403);
+                done();
+            });
+        })
+
+        it('Get non-existing path', function(done) {
+            var nonExistingUrl = constants.SERVER_URL + '/GetNonExistingPath';
+            request(nonExistingUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 404);
+                done();
+            });
+        });
+
+    }); // end describe
+
+    describe('Get index file', function() {
+
+        it('Get index file with default option', function(done) {
+            var defaultIndexUrl = constants.SERVER_URL + '/GetDefaultIndexFile';
+            request(defaultIndexUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('Get index file with custom option', function(done) {
+            var customIndexUrl = constants.SERVER_URL + '/GetCustomIndexFile';
+            request(customIndexUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('Get index file with non-string option', function(done) {
+            var indexFileUrl = constants.SERVER_URL + '/GetNonStrIndexFile';
+            request(indexFileUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 500);
+                done();
+            });
+        });
+
+        it('Get index file with undefined option', function(done) {
+            var undefinedIndexFileUrl = constants.SERVER_URL + '/GetUndefinedIndexFile';
+            request(undefinedIndexFileUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 500);
+                done();
+            });
+        });        
+
+    }); // end describe
+
+    describe('Get Folder', function() {
+        
+        it('Get a folder', function(done) {
+            var getFolderUrl = constants.SERVER_URL + '/GetFolder';
+            request(getFolderUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('Get a folder but no JSON', function(done) {
+            var getFolderNoJSONUrl = constants.SERVER_URL + '/GetFolderNoJSON';
+            request(getFolderNoJSONUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 404);
+                done();
+            });
+        });
+
+        it('Get a folder but JSON malformed', function(done) {
+            var getFolderMalformedJSONUrl = constants.SERVER_URL + '/GetFolderMalformedJSON';
+            request(getFolderMalformedJSONUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 500);
+                done();
+            });
+        });
+
+        it('Get a folder but JSON is incorrect', function(done) {
+            var getFolderIncorrectJSONUrl = constants.SERVER_URL + '/GetFolderIncorrectJSON';
+            request(getFolderIncorrectJSONUrl, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 500);
+                done();
+            });
+        });
+
+        it('Get a folder but malicious file in JSON', function(done) {
+            request(constants.SERVER_URL + '/GetFolderMaliciousFileJSON', function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 403);
+                done();
+            });
+        });
+
+        it('Get a folder but non-existing file in JSON', function(done) {
+            request(constants.SERVER_URL + '/GetFolderNonExistingFileJSON', function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 404);
+                done();
+            });
+        });
+
+    }); // end describe
+
+
+    describe('Verify Range feature', function() {
+        
+        it('Range is OK', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileRangeOK',
+                headers: {
+                    'Range': 'bytes=1-3'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 206);
+                assert.deepStrictEqual(res.body.length, 3);
+                done();
+            });
+        });
+
+        it('Range option is off', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileRangeIsOff',
+                headers: {
+                    'Range': 'bytes=1-3'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('Range unit is incorrect', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileRangeUnitIncorrect',
+                headers: {
+                    'Range': 'byte=1-3'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 416);
+                done();
+            });
+        });
+
+        it('Multiple ranges', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileMultipleRanges',
+                headers: {
+                    'Range': 'bytes=1-3,5-8'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 416);
+                done();
+            });
+        });
+
+        it('Range contains non-numeric values', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileNonNumericRange',
+                headers: {
+                    'Range': 'bytes=x-y'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 416);
+                done();
+            });
+        });
+
+        it('Range has no start value', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileNoStart',
+                headers: {
+                    'Range': 'bytes=-5'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 206);
+                done();
+            });
+        });
+        
+        it('Range has no end value', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileNoEnd',
+                headers: {
+                    'Range': 'bytes=4-'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 206);
+                done();
+            });
+        });
+
+        it('Range is inverted', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileRangeIsInverted',
+                headers: {
+                    'Range': 'bytes=2-1'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 416);
+                done();
+            });
+        });
+
+        it('Range has end greater than size', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileRangeEndExceedsSize',
+                headers: {
+                    'Range': 'bytes=1-25'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 416);
+                done();
+            });
+        });
+
+    });
+
+    describe('Verify If-Match header', function() {
+        it('If-Match header is *', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfMatchIsStar',
+                headers: {
+                    'If-Match': '\"*\"'
+                }
+            };
+            
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('If-Match header has a matching value', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfMatchIsMatch',
+                headers: {
+                    'If-Match': constants.HTTP_IF_MATCH_HEADER_VAL
+                }
+            };
+            
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+        
+        it('If-Match header does not have a matching value', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfMatchNoMatch',
+                headers: {
+                    'If-Match': constants.HTTP_IF_MATCH_HEADER_NO_MATCH_VAL
+                }
+            };
+            
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 412);
+                done();
+            });
+        });
+    });
+
+    describe('Verify If-None-Match header', function() {
+        it('If-None-Match header has a matching etag - strong comparison', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfNoneMatchStrong',
+                headers: {
+                    'If-None-Match': constants.HTTP_IF_NONE_MATCH_HEADER_VAL_2
+                }
+            };
+            
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 304);
+                done();
+            });
+        });
+
+        it('If-None-Match header has a matching etag - weak comparison', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfNoneMatchWeak',
+                headers: {
+                    'If-None-Match': constants.HTTP_IF_NONE_MATCH_HEADER_WEAK_VAL
+                }
+            };
+            
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 304);
+                done();
+            });
+        });
+
+        it('If-None-Match header has no matching etag', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfNoneMatchNoMatch',
+                headers: {
+                    'If-None-Match': constants.HTTP_IF_NONE_MATCH_HEADER_NO_MATCH_VAL
+                }
+            };
+            
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+        
+    });
+
+    describe('Verify If-Modified-Since header', function() {
+        it('If-Modified-Since header has older timestamp', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfModifiedSinceOldTimestamp',
+                headers: {
+                    'If-Modified-Since': constants.HTTP_OLDER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('If-Modified-Since header has newer timestamp', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfModifiedSinceNewTimestamp',
+                headers: {
+                    'If-Modified-Since': constants.HTTP_NEWER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 304);
+                done();
+            });
+        });
+
+        it('If-Modified-Since header has invalid timestamp', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfModifiedSinceInvalidTimestamp',
+                headers: {
+                    'If-Modified-Since': constants.HTTP_DATE_INVALID
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+        
+    });
+
+    describe('Verify If-Unmodified-Since header', function() {
+        it('If-Unmodified-Since header has older timestamp', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfUnmodifiedSinceOldTimestamp',
+                headers: {
+                    'If-Unmodified-Since': constants.HTTP_OLDER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 412);
+                done();
+            });
+        });
+
+        it('If-Unmodified-Since header has newer timestamp', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfUnmodifiedSinceNewTimestamp',
+                headers: {
+                    'If-Unmodified-Since': constants.HTTP_NEWER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+    });
+
+    describe('Verify combination of If-None-Match and If-Modified-Since headers', function() {
+        it('If-None-Match results in a match', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfNoneMatchIfModifiedSince1',
+                headers: {
+                    'If-None-Match': constants.HTTP_IF_NONE_MATCH_HEADER_VAL_2,
+                    'If-Modified-Since': constants.HTTP_NEWER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 304);
+                done();
+            });
+        });
+
+        it('If-None-Match results in no match', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfNoneMatchIfModifiedSince2',
+                headers: {
+                    'If-None-Match': constants.HTTP_IF_NONE_MATCH_HEADER_NO_MATCH_VAL,
+                    'If-Modified-Since': constants.HTTP_OLDER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('If-None-Match is not specified and header time is newer', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfNoneMatchIfModifiedSince3',
+                headers: {
+                    'If-Modified-Since': constants.HTTP_NEWER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 304);
+                done();
+            });
+        });
+
+        it('If-None-Match is not specified and header time is older', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfNoneMatchIfModifiedSince4',
+                headers: {
+                    'If-Modified-Since': constants.HTTP_OLDER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+        
+    });
+
+    describe('Verify combination of If-Match and If-Unmodified-Since headers', function() {
+        it('If-Match results in a match', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfMatchIfUnmodifiedSince1',
+                headers: {
+                    'If-Match': constants.HTTP_IF_MATCH_HEADER_VAL,
+                    'If-Unmodified-Since': constants.HTTP_NEWER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('If-Match results in no match', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfMatchIfUnmodifiedSince2',
+                headers: {
+                    'If-Match': constants.HTTP_IF_MATCH_HEADER_NO_MATCH_VAL,
+                    'If-Unmodified-Since': constants.HTTP_NEWER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 412);
+                done();
+            });
+        });
+
+        it('If-Match was not specified and header time is newer', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfMatchIfUnmodifiedSince3',
+                headers: {
+                    'If-Unmodified-Since': constants.HTTP_NEWER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('If-Match was not specified and header time is older', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfMatchIfUnmodifiedSince4',
+                headers: {
+                    'If-Unmodified-Since': constants.HTTP_OLDER_TIMESTAMP
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 412);
+                done();
+            });
+        });
+
+    });
+
+    describe('Verify combination of Range and If-Range headers', function() {
+        it('If-Range is invalid, Range is valid', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfRange1',
+                headers: {
+                    'Range': 'bytes=1-2',
+                    'If-Range': 'invalid'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('If-Range is invalid, Range is invalid', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfRange2',
+                headers: {
+                    'Range': 'bytes=3-1',
+                    'If-Range': 'invalid'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 416);
+                done();
+            });
+        });
+
+        it('If-Range is valid, Range not specified', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfRange3',
+                headers: {
+                    'If-Range': constants.HTTP_ETAG_VALID
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('If-Range is valid, Range is invalid', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfRange4',
+                headers: {
+                    'Range': 'bytes=a-b',
+                    'If-Range': constants.HTTP_ETAG_VALID
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 416);
+                done();
+            });
+        });
+
+        it('If-Range is valid, Range is valid', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFileIfRange5',
+                headers: {
+                    'Range': 'bytes=4-7',
+                    'If-Range': constants.HTTP_ETAG_VALID
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 206);
+                done();
+            });
+        });
+        
+    });
+
+    describe('Verify client encoding support', function() {
+        it('No encoding specified', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFolderNoEncoding',
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+        it('Encoding specified as empty string', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFolderEncodingEmptyString',
+                headers: {
+                    'Accept-Encoding': ''
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 406);
+                done();
+            });
+        });
+
+        it('Encoding weight set to 0 (identity)', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFolderEncodingWeight0A',
+                headers: {
+                    'Accept-Encoding': 'identity;q=0,gzip, deflate'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 406);
+                done();
+            });
+        });
+        
+        it('Encoding weight set to 0 (star)', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFolderEncodingWeight0B',
+                headers: {
+                    'Accept-Encoding': 'compress, *;q=0'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 406);
+                done();
+            });
+        });
+        
+        it('Encoding weight set to 0 (deflate)', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFolderEncodingWeight0C',
+                headers: {
+                    'Accept-Encoding': 'deflate;q=0'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 406);
+                done();
+            });
+        });
+
+        it('Encoding explicitly supported', function(done) {
+            var options = {
+                url: constants.SERVER_URL + '/GetFolderEncodingSupported',
+                headers: {
+                    'Accept-Encoding': 'deflate;q=1'
+                }
+            };
+
+            request(options, function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                done();
+            });
+        });
+
+    });
+
+    describe('Verify server options', function() {
+        it('Verify default headers option', function(done) {
+            request(constants.SERVER_URL + '/GetFileDefaultHeadersOption', function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                assert.deepStrictEqual(res.headers['default-header'], 'default-header-value');
+                done();
+            });
+        });
+
+        it('Verify default status option', function(done) {
+            request(constants.SERVER_URL + '/GetFileDefaultStatusOption', function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 501);
+                done();
+            });
+        });
+
+        it('Verify Server name in default headers', function(done) {
+            request(constants.SERVER_URL + '/GetFileServerNameHeader', function(error, res, body) {
+                assert.deepStrictEqual(res.statusCode, 200);
+                assert.deepStrictEqual(res.headers['server'], 'custom-server-name');
+                done();
+            });
+        });
+    });
+
+}); // end describe
+

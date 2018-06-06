@@ -1,0 +1,24 @@
+{
+  "name": "static-file-server-for-dummies",
+  "version": "1.0.0",
+  "description": "Static file server for understanding Node.js",
+  "main": "lib/index.js",
+  "scripts": {
+    "test": "./node_modules/.bin/mocha --timeout 10000 test/client/**/*.js"
+  },
+  "author": { "name": "Namit Bhalla",
+      "email": "oyenamit@gmail.com",
+      "url": "https://github.com/oyenamit"
+  },
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "archiver": ">=2.1.0",
+    "mime": "^1.5.0"
+  },
+  "devDependencies": {
+    "mocha": ">=5.0.1",
+    "express": "^4.16.2",
+    "request": "^2.83.0",
+    "jsdoc": "^3.5.5"
+  }
+}
